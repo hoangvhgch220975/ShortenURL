@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./FE/URL-Shorten-FE/src/assets/logo.png" alt="BiteLink Logo" width="96" />
+  <img src="FE/URL-Shorten-FE/src/assets/logo.png" alt="BiteLink Logo" width="96" />
 
   <h1>BiteLink URL Shortener</h1>
 
