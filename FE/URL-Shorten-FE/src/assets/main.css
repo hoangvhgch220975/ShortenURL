@@ -1,0 +1,51 @@
+/* General Styles */
+
+/* Đảm bảo html, body và #app chiếm toàn bộ màn hình */
+html, body, #app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: url('@/assets/background.png') no-repeat center center fixed;
+  background-size: cover;
+  
+}
+
+/* Cập nhật background */
+#app {
+  margin: 0;
+  padding: 0;
+  font-family: 'Arial', sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+/* Header Styles */
+h1 {
+  text-align: center;
+  margin-top: 100px; /* Đẩy xuống để tránh chồng lên navbar */
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #6a1b9a;
+}
+
+/* Main Content */
+main {
+  width: 100%;
+  max-width: 800px; /* Chiều rộng tối đa của nội dung chính */
+  margin: 120px auto 20px; /* Điều chỉnh để tránh bị che bởi navbar */
+  padding: 20px;
+  background: white; /* Màu nền cho nội dung chính */
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2); /* Đổ bóng cho nội dung */
+  border-radius: 10px; /* Bo góc cho nội dung */
+  text-align: center; /* Căn giữa nội dung */
+}
+
+/* Responsive Design */
+@media (min-width: 1024px) {
+  body {
+    background: linear-gradient(to right, #6a1b9a, #8e24aa); /* Gradient cho màn hình lớn */
+  }
+}

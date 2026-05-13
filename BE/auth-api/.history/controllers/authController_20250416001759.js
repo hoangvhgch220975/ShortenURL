@@ -1,0 +1,252 @@
+const jwt = require('jsonwebtoken');
+const validator = require('validator');
+const User = require('../models/userModel');
+const config = require('../config/config');
+
+// Danh sách token bị invalidate
+const invalidatedTokens = new Set();
+
+// Sinh token JWT
+// Hàm sinh token mới
+const generateToken = (userId, email) => {
+  return jwt.sign(
+    { 
+      id: userId, 
+      email, 
+      iat: Date.now() 
+    },
+    config.JWT_SECRET,
+    { 
+      expiresIn: config.JWT_EXPIRES_IN 
+    }
+  );
+};
+
+// Phương thức refresh token
+exports.refreshToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Không tìm thấy token'
+      });
+    }
+
+    try {
+      // Giải mã token hiện tại
+      const decoded = jwt.verify(token, config.JWT_SECRET);
+
+      // Tìm user
+      const user = await User.findUserById(decoded.id);
+
+      if (!user) {
+        return res.status(401).json({
+          status: 'error',
+          message: 'Người dùng không tồn tại'
+        });
+      }
+
+      // Tạo token mới
+      const newToken = generateToken(user.Id, user.Email);
+
+      res.status(200).json({
+        status: 'success',
+        data: {
+          token: newToken,
+          userId: user.Id,
+          email: user.Email
+        }
+      });
+    } catch (jwtError) {
+      // Xử lý các lỗi liên quan đến token
+      if (jwtError.name === 'TokenExpiredError') {
+        return res.status(401).json({
+          status: 'error',
+          message: 'Token đã hết hạn'
+        });
+      }
+
+      return res.status(401).json({
+        status: 'error',
+        message: 'Token không hợp lệ'
+      });
+    }
+  } catch (error) {
+    console.error('Lỗi refresh token:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Lỗi máy chủ'
+    });
+  }
+};
+
+// Middleware kiểm tra token
+exports.protect = async (req, res, next) => {
+  try {
+    let token;
+    
+    // Kiểm tra Authorization header
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+      
+      // Kiểm tra xem token đã bị invalidate chưa
+      if (invalidatedTokens.has(token)) {
+        return res.status(401).json({
+          status: 'error',
+          message: 'Token đã bị hủy. Vui lòng đăng nhập lại.'
+        });
+      }
+      
+      try {
+        // Xác thực token
+        const decoded = jwt.verify(token, config.JWT_SECRET);
+        
+        // Kiểm tra user tồn tại
+        const user = await User.findUserById(decoded.id);
+        
+        if (!user) {
+          return res.status(401).json({
+            status: 'error',
+            message: 'Người dùng không tồn tại'
+          });
+        }
+        
+        req.user = user;
+        req.token = token;
+        next();
+      } catch (jwtError) {
+        // Xử lý lỗi token
+        if (jwtError.name === 'TokenExpiredError') {
+          return res.status(401).json({
+            status: 'error',
+            message: 'Phiên đăng nhập đã hết hạn'
+          });
+        }
+        
+        return res.status(401).json({
+          status: 'error',
+          message: 'Token không hợp lệ'
+        });
+      }
+    } else {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Vui lòng đăng nhập'
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      status: 'error',
+      message: 'Lỗi máy chủ'
+    });
+  }
+};
+// Đăng nhập
+exports.login = async (req, res) => {
+  try {
+    const { uid, email } = req.body;
+    
+    // Validate email
+    if (!email || !validator.isEmail(email)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email không hợp lệ'
+      });
+    }
+    
+    // Kiểm tra hoặc tạo user
+    let user = await User.findUserByEmail(email);
+    
+    if (!user) {
+      user = await User.createUser(email, uid);
+    }
+    
+    // Tạo token
+    const token = generateToken(user.Id, user.Email);
+    
+    res.status(200).json({
+      status: 'success',
+      data: {
+        userId: user.Id,
+        email: user.Email,
+        token
+      }
+    });
+  } catch (error) {
+    console.error('Lỗi đăng nhập:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Lỗi đăng nhập'
+    });
+  }
+};
+
+// Invalidated tokens set
+// const invalidatedTokens = new Set();
+
+// Phương thức logout
+exports.logout = async (req, res) => {
+  try {
+    // Lấy token từ request
+    const token = req.token;
+    
+    // Thêm token vào danh sách các token đã bị invalidate
+    if (token) {
+      invalidatedTokens.add(token);
+    }
+    
+    res.status(200).json({
+      status: 'success',
+      message: 'Đăng xuất thành công'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Lỗi đăng xuất'
+    });
+  }
+};
+
+
+// Kiểm tra token
+exports.validate = async (req, res) => {
+  try {
+    res.status(200).json({
+      status: 'success',
+      data: {
+        user: {
+          id: req.user.Id,
+          email: req.user.Email
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Lỗi xác thực'
+    });
+  }
+};
+
+
+exports.checkTokenValidity = async (req, res) => {
+  try {
+    // Nếu request đến được đây, nghĩa là token đã hợp lệ
+    res.status(200).json({
+      status: 'success',
+      message: 'Token hợp lệ',
+      user: {
+        id: req.user.Id,
+        email: req.user.Email
+      }
+    });
+  } catch (error) {
+    console.error('Lỗi kiểm tra token:', error);
+    res.status(401).json({
+      status: 'error',
+      message: 'Token không hợp lệ'
+    });
+  }
+};
